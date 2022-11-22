@@ -50,7 +50,7 @@ int main (int argc, char** argv){
 //Set which process this is
 int position = atoi(argv[1]);
 
-alarm(10);
+//alarm(10);
 
 signal(SIGALRM, myhandler);
 signal(SIGINT, myhandler);
@@ -165,7 +165,6 @@ doneFlag = 0;
 			printf("Releasing resource %d\n", resRequested);
 			procs[position].resRequest = (resRequested * -1); //Release the resource
 			res[resRequested].allocated -= maxClaims[resRequested]; //Deduct the claim from the allocation of the resource.					
-			continue;
 				
 		}
 		
