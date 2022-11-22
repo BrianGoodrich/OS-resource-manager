@@ -32,6 +32,7 @@
 struct process{
 int resRequest;
 int claims[21];
+int allocated[21];
 };
 
 //Struct for keeping track of the allocated and total available for each resource.
@@ -42,24 +43,26 @@ int allocated;
 int totalAvailable;
 };
 
-//Struct for determining safe state
-struct state{
-int available[18];
-int alloc[20][1];
-};
+//Global var counting number of processes so we know how many times to loop in safe()
+int numProcesses;
 
 static void myhandler(int s);
 
+int safe();
+
 int main (int argc, char** argv){
 
+//Array we will treat as our wait queue
 int waitQ [18];
 
-//Set 5 second timer
+//Var for total number of processes created so that we can terminate at 40.
+int totalProcesses;
 
+
+//Set 5 second timer
 alarm(5);
 
 //Handle the sigalarm
-
 signal(SIGALRM, myhandler);
 signal(SIGINT, myhandler);
 
@@ -135,6 +138,7 @@ if(childPid == 0){
 	execvp(args[0], args);
 }
 
+numProcesses++;
 //Loop looking for a requested resource.
 while(1){
 
@@ -151,12 +155,18 @@ while(1){
 		if(procs[x].resRequest != 30 && procs[x].resRequest > 0){
 			printf("Process %d has requested resource %d\nTime of request %d seconds, %d nanoseconds\n", x, procs[x].resRequest, clock[0], clock[1]);
 			
-			//If request + allocation > totalAvailable deny request
+			//If request + allocation > totalAvailable deny request and put in waitQ.
 			if(res[procs[x].resRequest].allocated + res[procs[x].resRequest].requested > res[procs[x].resRequest].totalAvailable)
 			{
 				waitQ[x] = procs[x].resRequest; 	
-				printf("Allocation not possible process waiting\n");
-					
+				printf("Allocation not possible process placed in wait queue\n");
+				break;		
+			}
+
+		//If our algorithm has determined we are in a safe state then carry out the allocation.
+			if(safe()){
+				printf("State is safe. Allocating resources.\n");
+
 			}
 			
 			res[procs[x].resRequest].allocated += res[procs[x].resRequest].requested;	
@@ -200,6 +210,122 @@ static void myhandler(int s){
 	exit(1);
 }
 
+
+
+//Function for determining safe state
+
+int safe (){
+
+int currentAvailable[21];
+
+int possible = 1;
+
+int found;
+
+int x;
+
+//Initially set array to -1
+
+for(x = 0; x < 18; x++){
+	potentialProcs[18] = -1;
+}
+
+
+//Attach to shared memory for processes
+
+int shmid1 = shmget(PROCESS_SHMKEY, PROC_BUF, 0777 | IPC_CREAT);
+
+if(shmid1 == -1){
+
+        perror("in oss shmget for processes");
+        exit(1);
+
+}
+
+struct process * procs = (struct process*)(shmat(shmid1, 0, 0));
+
+//Get temp claims array so that we can modify it and elminate processes without messing up actual
+int tempClaims[18][21];
+
+int j;
+for(x = 0; x < 18; x++){
+	for(j = 1; j < 21; j++){
+		tempClaims[x][j] = procs[x].claims[j];
+	}
+}
+
+//Attach to shared memory for resources
+
+int shmid2 = shmget(RES_SHMKEY, RES_BUF, 0777 | IPC_CREAT);
+
+if(shmid2 == -1){
+
+        perror("error in oss shmget for resources");
+        exit(1);
+
+
+}
+
+struct resources * res = (struct resources*)(shmat(shmid2, 0, 0));
+
+//Now set up currentAvailable vector.
+
+x;
+for(x = 1; x < 21; x++){
+currentAvailable[x] = res[x].totalAvailable - res[x].allocated;
+}
+
+while(possible){
+
+//Find a process thats max claims could be satisfied by current availability of resources.
+
+int flag = 0;
+int i; 
+int index;
+
+for(x = 0; x < 18; x++){
+	
+	for(i = 1; i < 21; i++){
+		
+		if(tempClaims[x][i] - procs[x].allocated[i] <= currentAvailable[i]){
+			flag++;
+		}
+
+	}
+	//After the above for loop if we have found a process that can be satisfied by the current availability of each process then we set found and break the loop.
+	if(flag == 20){
+		found = 1;
+		index = x;		
+		break;
+	}
+}
+
+//If we did find a process above that can be finished by current resource availability then we will simulate releasing its resources and set its values so that it can't possibly fulfill the requirements again 
+	if(found){
+		//We are setting the index above of which process is able to fulfill. Here we add its current allocation to our availability. Then just set its tempClaims super high so it wont work again 
+		for(x = 1; x < 21; x ++){
+			currentAvailable[x] += procs[index].allocated[x];
+			tempClaims[index][x] = 5000;
+
+		}
+		
+		//If we found that every process including 17 can finish, and we havent set possible to 0 and broken the loop yet, we need this to break the loop if we are in a safe state. So break the loop 
+		if(index == 17){
+			break;
+		}
+
+	}
+	else{
+		possible = 0;
+	}
+
+
+}//End while
+
+return possible;
+
+//At this point the loop is broken 
+}
 
 
 

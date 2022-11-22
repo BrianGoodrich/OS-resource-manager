@@ -32,6 +32,7 @@
 struct process{
 int resRequest;
 int claims[21];
+int allocated[21];
 };
 
 //Struct for resources
