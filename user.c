@@ -152,15 +152,18 @@ doneFlag = 0;
 
 
 
-	//If we get to the interval on the clock then request a resource.
+//If we get to the interval on the clock then request a resource.
+
 	if(clock[1] >= interval && currentlyRequesting == 0 && nextSecond == clock[0]){
 		//Set what the next second interval will be so this doesn't fire on every pass that is greated than our interval
 		nextSecond++;
-	
-		if(procs[position].resRequest == 30){ //If we have already been granted a resource release it
+
+	//If we have already been granted a resource then release it.
+
+		if(procs[position].resRequest == 30){ 
 			printf("Releasing resource %d\n", resRequested);
 			procs[position].resRequest = (resRequested * -1); //Release the resource
-			res[resRequested].release = maxClaims[resRequested]; //Set the current release for the resource to be what this process is releasing.					
+			res[resRequested].allocated -= maxClaims[resRequested]; //Deduct the claim from the allocation of the resource.					
 			continue;
 				
 		}

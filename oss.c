@@ -149,7 +149,7 @@ while(1){
 	for(x = 0; x < 18; x++){
 		//If there is a request handle it here		
 		if(procs[x].resRequest != 30 && procs[x].resRequest > 0){
-			printf("Process %d has requested resource %d\nTime of request %d seconds, %d nanoseconds\n", x, procs[x], clock[0], clock[1]);
+			printf("Process %d has requested resource %d\nTime of request %d seconds, %d nanoseconds\n", x, procs[x].resRequest, clock[0], clock[1]);
 			
 			//If request + allocation > totalAvailable deny request
 			if(res[procs[x].resRequest].allocated + res[procs[x].resRequest].requested > res[procs[x].resRequest].totalAvailable)
@@ -159,13 +159,13 @@ while(1){
 					
 			}
 			
+			res[procs[x].resRequest].allocated += res[procs[x].resRequest].requested;	
 			procs[x].resRequest = 30; //Set this flag to say we granted the request.
 		}
 		
 		//If a processes has released a resource we want to handle it here
 		if(procs[x].resRequest != 30 && procs[x].resRequest < 0){
-			posRes = procs[x].resRequest * -1;
-			res[posRes].allocated -= res[posRes].release;
+			posRes = procs[x].resRequest * - 1;
 			
 		}
 	}
