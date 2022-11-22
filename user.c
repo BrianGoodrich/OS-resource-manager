@@ -33,6 +33,8 @@ struct process{
 int resRequest;
 int claims[21];
 int allocated[21];
+int terminated;
+int blocked;
 };
 
 //Struct for resources
@@ -104,6 +106,8 @@ int x;
 
 for(x = 1; x < 21; x++){
 
+srand((unsigned) time(&t));
+
 maxClaims[x] = (rand() % res[x].totalAvailable);
 
 unchangedClaims[x] = maxClaims[x];
@@ -146,7 +150,7 @@ doneFlag = 0;
 	if(currentlyRequesting == 1){
 		if(procs[position].resRequest == 30){ //If we grant resource in oss we set to 30
 			maxClaims[resRequested] = -1;
-			printf("Resource %d granted\n", resRequested);
+			//printf("Resource %d granted\n", resRequested);
 			currentlyRequesting = 0;		
 		}
 	}
@@ -159,13 +163,12 @@ doneFlag = 0;
 		//Set what the next second interval will be so this doesn't fire on every pass that is greated than our interval
 		nextSecond++;
 
-	//If we have already been granted a resource then release it.
-
+		//If we have already been granted a resource then release it.
 		if(procs[position].resRequest == 30){ 
-			printf("Releasing resource %d\n", resRequested);
+			//printf("Releasing resource %d\n", resRequested);
 			procs[position].resRequest = (resRequested * -1); //Release the resource
-			res[resRequested].allocated -= maxClaims[resRequested]; //Deduct the claim from the allocation of the resource.					
-				
+			//res[resRequested].allocated -= maxClaims[resRequested]; //Deduct the claim from the allocation of the resource.					
+			continue;			
 		}
 		
 		//Loop to request our next resource
@@ -175,11 +178,10 @@ doneFlag = 0;
 			if(maxClaims[j] != -1){
 			
 				procs[position].resRequest = j; //Set our process to the resource we want		
-				res[j].requested = maxClaims[j]; //Set what we are requesting
-				printf("Requesting resource: %d Max claim: %d\n", j, maxClaims[j]);
+				//res[j].requested = maxClaims[j]; //Set what we are requesting
+				//printf("Requesting resource: %d Max claim: %d\n", j, maxClaims[j]);
 				currentlyRequesting = 1; //Set flag to know we're expecting approval.
-				resRequested = j;
-				
+				resRequested = j;				
 				break;
 			}
 
@@ -189,11 +191,13 @@ doneFlag = 0;
 }//while loop
 }//main
 
+
+procs[position].terminated = 1;
+
 printf("finishing user process\n");
 shmctl(shmid1, IPC_RMID, NULL);
 shmctl(shmid2, IPC_RMID, NULL);
 shmctl(shmid3, IPC_RMID, NULL);
-
 }
 
 

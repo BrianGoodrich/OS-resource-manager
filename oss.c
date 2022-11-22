@@ -35,6 +35,8 @@ struct process{
 int resRequest;
 int claims[21];
 int allocated[21];
+int terminated;
+int blocked;
 };
 
 //Struct for keeping track of the allocated and total available for each resource.
@@ -49,7 +51,7 @@ int totalAvailable;
 int intArray[18];
 int front = 0;
 int rear = -1;
-int itemCount;
+int itemCount = 0;
 
 static void myhandler(int s);
 
@@ -73,7 +75,7 @@ int waitQ [18];
 //Var for total number of processes created so that we can terminate at 40.
 int totalProcesses;
 
-int nextSecond;
+int nextSecond = 0;
 
 int qIndex = 0;
 
@@ -84,7 +86,7 @@ alarm(5);
 signal(SIGALRM, myhandler);
 signal(SIGINT, myhandler);
 
-unsigned int increment = 100000; //Amount we will increment each loop iteration for now.
+unsigned int increment = 1000; //Amount we will increment each loop iteration for now.
 
 //Attach to the shared memory for processes
 
@@ -101,12 +103,11 @@ struct process * procs = (struct process*)(shmat(shmid1, 0, 0));
 
 //Default everything in the processes to be 0.
 int i;
-for(i = 0; i < 18; i++){
-	procs[i].resRequest = 0;
-}
-
 int k;
 for(i = 0; i < 18; i++){
+	procs[i].resRequest = 0;
+	procs[i].terminated = 0;
+	procs[i].blocked = 0;
 	for(k = 1; k < 21; k++){
 		procs[i].claims[k] = 0;
 		procs[i].allocated[k] = 0;
@@ -151,7 +152,8 @@ for(x = 1; x < 21; x++){
 res[x].totalAvailable = (rand() % (10-2) + 1); //Generate random number 1-10 for our resource
 
 }
-
+/*
+//Launch first process for testing
 pid_t childPid = fork();
 
 if(childPid == -1){
@@ -163,7 +165,13 @@ if(childPid == 0){
 	char* args[] = {"./user", "0", 0};
 	execvp(args[0], args);
 }
+*/
 
+int nextProcessIndex = 0;
+
+int previousBlocked = 50;
+
+totalProcesses = 0;
 //Loop looking for a requested resource.
 while(1){
 
@@ -172,66 +180,101 @@ while(1){
 		clock[0] += 1;
 		clock[1] = clock[1] - 1000000000;
 	}
+	
+	if(clock[0] == nextSecond && totalProcesses < 2){
+		printf("Total processes = %d launching new process\n", totalProcesses);
+		
+		char charIndex[1];
+	
+		sprintf(charIndex, "%d", nextProcessIndex);
+
+		pid_t childPid = fork();
+
+		if(childPid == -1){
+        	perror("failed to fork in oss");
+        	exit(1);
+		}
+
+		if(childPid == 0){
+        		char* args[] = {"./user", charIndex, 0};
+        		execvp(args[0], args);
+		}
+
+		totalProcesses++;
+		nextProcessIndex++;
+		nextSecond++;
+	}
 
 	int posRes;
 	//Loop through all the processes seeing if any have requested
 	for(x = 0; x < 18; x++){
 		//If there is a request handle it here		
-		if(procs[x].resRequest != 30 && procs[x].resRequest > 0){
-			printf("Process %d has requested resource %d\nTime of request %d seconds, %d nanoseconds\n", x, procs[x].resRequest, clock[0], clock[1]);
-			
-			//If request + allocation > totalAvailable deny request and put in waitQ.
-			if(res[procs[x].resRequest].allocated + res[procs[x].resRequest].requested > res[procs[x].resRequest].totalAvailable)
-			{
-				//Place in wait queue
-				enqueue(x);
-				printf("Allocation not possible process placed in wait queue\n");
-				break;		
-			}
+		if(procs[x].resRequest != 30 && procs[x].resRequest > 0 && procs[x].blocked != 1){
+			printf("Process %d has requested %d of resource %d\nTime of request %d seconds, %d nanoseconds\n", x, procs[x].claims[procs[x].resRequest] , procs[x].resRequest, clock[0], clock[1]);
 
 			//If our algorithm has determined we are in a safe state then carry out the allocation.
 			if(safe()){
 				printf("State is safe. Allocating resources.\n");
 				//Add the request to the allocation for the resource
-				res[procs[x].resRequest].allocated += res[procs[x].resRequest].requested;
+				res[procs[x].resRequest].allocated += procs[x].claims[procs[x].resRequest];
 				//Add the amount requested to the allocation for that resource in the process.
-				procs[x].allocated[procs[x].resRequest] += res[procs[x].resRequest].requested;
+				procs[x].allocated[procs[x].resRequest] += procs[x].claims[procs[x].resRequest];
 				//Set flag for user process.
 				procs[x].resRequest = 30;			
 			}
 			else{ //Here we would be in an unsafe state, so we wont grant the request, and we will place the resource in the wait queue.
-				printf("Unsafe state. Placing process in wait queue");		
+				printf("Cannot grant %d of resource %d to process %d. Placing process in wait q\n", res[procs[x].resRequest].requested, procs[x].resRequest, x);		
+				procs[x].blocked = 1;		
 				enqueue(x);
 			}
 			
 		}
 		
-		//If a processes has released a resource we want to handle it here. For some reason this will fire multiple times on a release so the removing from allocated is being done in user. At the point of release of a resource, we would want to check to wait queue to see if there are any processes that could be fulfilled.
+		//If a processes has released a resource we want to handle it here. At the point of release of a resource, we would want to check to wait queue to see if there are any processes that could be fulfilled.
 		if(procs[x].resRequest != 30 && procs[x].resRequest < 0){
+			
 			posRes = procs[x].resRequest * - 1;
-			int loop = 0;
-			while(loop < 18){
-				int tempIndex = dequeue(); //Index of a process placed in the wait queue.
-			
-			//If the request for the process can be granted by current availability then grant the request, if not place back in queue and continue loop		
-				if(procs[tempIndex].claims[procs[tempIndex].resRequest] <= res[procs[tempIndex].resRequest].totalAvailable - res[procs[tempIndex].resRequest].allocated){ 			//Add the requested amount to the allocation for that resource.
-					res[procs[tempIndex].resRequest].allocated += procs[tempIndex].claims[procs[tempIndex].resRequest];
-					//Add the amount requested to the allocation for that resource in the process.							
-					procs[tempIndex].allocated[procs[tempIndex].resRequest] += procs[tempIndex].claims[procs[tempIndex].resRequest];
-					//Set flag
-					procs[tempIndex].resRequest = 30;
-					break;
+			//Set this back to 0 so that this will not continue firing this if statement after releasing.
+			procs[x].resRequest = 0;
 
-				}
-				else{ //If this fires then there still isn't enonugh resources place that index back in queue and try again.
-					enqueue(tempIndex);
-				}
+			//Since a resource is being released, remove that amount from the allocation of that resource 
+			res[posRes].allocated -= procs[x].claims[posRes];
 			
-			loop++; //Do this process 18 times.
-			if(loop == 17){
-				printf("No processes in queue were able to be granted resources.\n");
-			}
-			}
+			//Similarly we are releasing a resource so this would just be set to 0.
+			procs[x].allocated[posRes] = 0;
+
+			printf("Resource %d being released by process %d\n", posRes, x);
+			
+			int loop = 0;
+			//Only do this when there is something in the queue
+			if(size() > 0){
+				while(loop <= size()){
+					int tempIndex = dequeue(); //Index of a process placed in the wait queue.
+			
+				//If the request for the process can be granted by current availability then grant the request, if not place back in queue and continue loop		
+					if(procs[tempIndex].claims[procs[tempIndex].resRequest] <= res[procs[tempIndex].resRequest].totalAvailable - res[procs[tempIndex].resRequest].allocated){ 			
+						printf("Process %d removed from queue, removing blocked flag.\n", tempIndex, procs[tempIndex].resRequest);
+						/*
+						//Add the requested amount to the allocation for that resource.
+						res[procs[tempIndex].resRequest].allocated += procs[tempIndex].claims[procs[tempIndex].resRequest];
+						//Add the amount requested to the allocation for that resource in the process.							
+						procs[tempIndex].allocated[procs[tempIndex].resRequest] += procs[tempIndex].claims[procs[tempIndex].resRequest];
+						*/
+						procs[tempIndex].blocked = 0;
+						break;
+
+					}
+					else{ //If this fires then there still isn't enonugh resources place that index back in queue and try again.
+						enqueue(tempIndex);
+					}
+			
+					loop++; //Do this process for each item in the queue. It will either be placed back in or removed and fulfilled.
+					if(loop == size()){
+						printf("No processes in queue were able to be granted resources.\n");
+						break;
+					}
+				}
+			}	
 		}
 	}
 
@@ -271,8 +314,6 @@ static void myhandler(int s){
 
 int safe (){
 
-printf("testing state\n");
-
 int currentAvailable[21];
 
 int possible = 1;
@@ -288,7 +329,7 @@ int shmid1 = shmget(PROCESS_SHMKEY, PROC_BUF, 0777 | IPC_CREAT);
 
 if(shmid1 == -1){
 
-        perror("in oss shmget for processes");
+        perror("in oss shmget for processes\n");
         exit(1);
 
 }
@@ -311,7 +352,7 @@ int shmid2 = shmget(RES_SHMKEY, RES_BUF, 0777 | IPC_CREAT);
 
 if(shmid2 == -1){
 
-        perror("error in oss shmget for resources");
+        perror("error in oss shmget for resources\n");
         exit(1);
 
 
@@ -354,7 +395,7 @@ for(x = 0; x < 18; x++){
 //If we did find a process above that can be finished by current resource availability then we will simulate releasing its resources and set its values so that it can't possibly fulfill the requirements again 
 	if(found){
 		//We are setting the index above of which process is able to fulfill. Here we add its current allocation to our availability. Then just set its tempClaims super high so it wont work again 
-		for(x = 1; x < 21; x ++){
+		for(x = 1; x < 21; x++){
 			currentAvailable[x] += procs[index].allocated[x];
 			tempClaims[index][x] = 5000;
 
@@ -366,8 +407,21 @@ for(x = 0; x < 18; x++){
 		}
 
 	}
-	else{
+	else{		
 		possible = 0;
+		printf("None found in safe()\n");
+		
+		for(x = 1; x < 21; x++){
+			printf("currentAvail R%d = %d\n", x, currentAvailable[x]);
+			
+		}
+		for(x = 1; x < 21; x++){
+
+			printf("totalAvailable R%d = %d\n", x, res[x].totalAvailable);
+		}
+		for(x = 1; x < 21; x++){
+			printf("CurrentlyAllocated R%d = %d\n", x, res[x].allocated);
+		} 
 	}
 
 
@@ -402,7 +456,7 @@ void enqueue(int procIndex){
 		itemCount++;
 	}
 	else{
-		printf("Queue full");
+		printf("Queue full\n");
 	}
 
 }
