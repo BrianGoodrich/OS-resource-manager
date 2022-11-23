@@ -92,7 +92,7 @@ int* clock = (int*)(paddr);
 
 srand((unsigned) time(0));
 
-int interval = (rand() % (500000000 - 2) + 1); 
+int interval = (rand() % (250000000 - 2) + 1); 
 
 //Generate max claims vector
 int maxClaims [21];
@@ -111,14 +111,8 @@ for(x = 1; x < 21; x++){
 
 	procs[position].claims[x] = maxClaims[x];
 
-	printf("Max claims for resource %d is : %d\n", x, maxClaims[x]);
-
 }
 
-//Just printing some stuff here
-/*
-printf("Pritning values from resources in shared mem\nR1: %d R2: %d R3: %d R4: %d R5: %d R6: %d R7: %d\n", res[1].totalAvailable, res[2].totalAvailable, res[3].totalAvailable, res[4].totalAvailable, res[5].totalAvailable, res[6].totalAvailable, res[7].totalAvailable);
-*/
 
 //Here set the process to terminated = 2 for running, will set to 1 when terminated.
 procs[position].terminated = 2;
@@ -135,33 +129,31 @@ int nextSecond = clock[0];
 while(1){
 
 //Check to see if we need to terminate
-int x;
+	int x;
 
-for(x = 1; x < 21; x++){
-	if(maxClaims[x] != -1){
-		doneFlag = 1;
+	for(x = 1; x < 21; x++){
+		if(maxClaims[x] != -1){
+			doneFlag = 1;
+		}
+	} 
+
+	if(doneFlag == 0){
+		break;
 	}
-} 
 
-if(doneFlag == 0){
-	printf("Process %d complete, terminating\n", position);
-	myhandler(1);
-}
-
-doneFlag = 0;
+	doneFlag = 0;
 	
-//If we are waiting on a resource request we will hit this and check to see if its been granted each loop
+	//If we are waiting on a resource request we will hit this and check to see if its been granted each loop
 	if(currentlyRequesting == 1){
 		if(procs[position].resRequest == 30){ //If we grant resource in oss we set to 30
 			maxClaims[resRequested] = -1;
-			//printf("Resource %d granted\n", resRequested);
 			currentlyRequesting = 0;		
 		}
 	}
 
 
 
-//If we get to the interval on the clock then request a resource.
+	//If we get to the interval on the clock then request a resource.
 
 	if(clock[1] >= interval && currentlyRequesting == 0 && nextSecond == clock[0]){
 		//Set what the next second interval will be so this doesn't fire on every pass that is greated than our interval
@@ -169,9 +161,7 @@ doneFlag = 0;
 
 		//If we have already been granted a resource then release it.
 		if(procs[position].resRequest == 30){ 
-			//printf("Releasing resource %d\n", resRequested);
 			procs[position].resRequest = (resRequested * -1); //Release the resource
-			//res[resRequested].allocated -= maxClaims[resRequested]; //Deduct the claim from the allocation of the resource.					
 			continue;			
 		}
 		
@@ -182,23 +172,17 @@ doneFlag = 0;
 			if(maxClaims[j] != -1){
 			
 				procs[position].resRequest = j; //Set our process to the resource we want		
-				//res[j].requested = maxClaims[j]; //Set what we are requesting
-				//printf("Requesting resource: %d Max claim: %d\n", j, maxClaims[j]);
 				currentlyRequesting = 1; //Set flag to know we're expecting approval.
 				resRequested = j;				
 				break;
 			}
-
 		}	
-
-
-}//while loop
+	}//while loop
 }//main
 
 
 procs[position].terminated = 1;
 
-//printf("finishing user process\n");
 shmctl(shmid1, IPC_RMID, NULL);
 shmctl(shmid2, IPC_RMID, NULL);
 shmctl(shmid3, IPC_RMID, NULL);

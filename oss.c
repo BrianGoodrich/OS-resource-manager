@@ -91,7 +91,7 @@ if(filePtr == NULL){
 perror("file open error");
 }
 
-unsigned int increment = 1000; //Amount we will increment each loop iteration for now.
+unsigned int increment = 2000; //Amount we will increment each loop iteration for now.
 
 //Attach to the shared memory for processes
 
@@ -178,20 +178,25 @@ while(1){
 	}
 
 	//Every 2 seconds generate a new process.
-	if(clock[0] == nextSecond && totalProcesses < 18){
+if(clock[0] == nextSecond){
 		
 		//Count how many running processes are in the system
-		int runningProcs;
+		int runningProcs = 0;
         	for(x = 0; x < 18; x++){
                 	if(procs[x].terminated == 2){
                         	runningProcs++;
                 	}
         	}
+		/*
 		//If there are 18 running processes wait for one to to finish.
-		if(runningProcs == 18){
+		if(totalProcesses >= 18){
 			wait(NULL);
+			runningProcs = 0;
 		}
-		
+		*/
+
+	//Only generate a new resource if there are less than 18 currently running.
+	if(runningProcs < 18){
 		if(fileLines < 10000){
 			fprintf(filePtr, "Total processes = %d launching new process\n", totalProcesses);
 			fileLines++;
@@ -229,6 +234,7 @@ while(1){
 		nextProcessIndex++;
 		nextSecond++;
 	}
+}
 
 	int posRes;
 	//Loop through all the processes seeing if any have requested
@@ -242,7 +248,7 @@ while(1){
 			}
 
 			//If our algorithm has determined we are in a safe state then carry out the allocation.
-			if(safe()){
+			if(safe()|| procs[x].claims[procs[x].resRequest] == 0){
 				
 				if(fileLines < 10000){
 					fprintf(filePtr,"State is safe. Allocating resources.\n");
@@ -259,7 +265,7 @@ while(1){
 			else{ //Here we would be in an unsafe state, so we wont grant the request, and we will place the resource in the wait queue.
 				
 				if(fileLines < 10000){
-					fprintf(filePtr,"Cannot grant %d of resource %d to process %d. Placing process in wait q\n", res[procs[x].resRequest].requested, procs[x].resRequest, x);		
+					fprintf(filePtr,"Cannot grant %d of resource %d to process %d. Placing process in wait q\n", procs[x].claims[procs[x].resRequest], procs[x].resRequest, x);		
 					fileLines++;
 				}
 
