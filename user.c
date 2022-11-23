@@ -52,8 +52,7 @@ int main (int argc, char** argv){
 //Set which process this is
 int position = atoi(argv[1]);
 
-//alarm(10);
-
+alarm(30);
 signal(SIGALRM, myhandler);
 signal(SIGINT, myhandler);
 
@@ -91,9 +90,7 @@ int* clock = (int*)(paddr);
 //Generate random time interval in nanoseconds for user to wait for to request a resource
 //Random number will be 1-500,000,000 ns range.
 
-time_t t;
-
-srand((unsigned) time(&t));
+srand((unsigned) time(0));
 
 int interval = (rand() % (500000000 - 2) + 1); 
 
@@ -106,20 +103,25 @@ int x;
 
 for(x = 1; x < 21; x++){
 
-srand((unsigned) time(&t));
+	srand((unsigned) time(0));
 
-maxClaims[x] = (rand() % res[x].totalAvailable);
+	maxClaims[x] = (rand() % res[x].totalAvailable);
 
-unchangedClaims[x] = maxClaims[x];
+	unchangedClaims[x] = maxClaims[x];
 
-procs[position].claims[x] = maxClaims[x];
+	procs[position].claims[x] = maxClaims[x];
 
-printf("Max claims for resource %d is : %d\n", x, maxClaims[x]);
+	printf("Max claims for resource %d is : %d\n", x, maxClaims[x]);
 
 }
 
 //Just printing some stuff here
+/*
 printf("Pritning values from resources in shared mem\nR1: %d R2: %d R3: %d R4: %d R5: %d R6: %d R7: %d\n", res[1].totalAvailable, res[2].totalAvailable, res[3].totalAvailable, res[4].totalAvailable, res[5].totalAvailable, res[6].totalAvailable, res[7].totalAvailable);
+*/
+
+//Here set the process to terminated = 2 for running, will set to 1 when terminated.
+procs[position].terminated = 2;
 
 //Here in the loop we will request our resources from the maxClaims vector as long as our time has passed on the clock. We will request the resources in order according to the 
 x = 0;
@@ -127,6 +129,8 @@ int doneFlag = 0;
 int currentlyRequesting = 0;
 int resRequested;
 int nextSecond = clock[0];
+
+
 
 while(1){
 
@@ -194,7 +198,7 @@ doneFlag = 0;
 
 procs[position].terminated = 1;
 
-printf("finishing user process\n");
+//printf("finishing user process\n");
 shmctl(shmid1, IPC_RMID, NULL);
 shmctl(shmid2, IPC_RMID, NULL);
 shmctl(shmid3, IPC_RMID, NULL);

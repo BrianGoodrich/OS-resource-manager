@@ -69,15 +69,10 @@ int dequeue();
 
 int main (int argc, char** argv){
 
-//Array we will treat as our wait queue
-int waitQ [18];
-
 //Var for total number of processes created so that we can terminate at 40.
 int totalProcesses;
 
 int nextSecond = 0;
-
-int qIndex = 0;
 
 //Set 5 second timer
 alarm(5);
@@ -85,6 +80,16 @@ alarm(5);
 //Handle the sigalarm
 signal(SIGALRM, myhandler);
 signal(SIGINT, myhandler);
+
+//Set up file stuff
+
+int fileLines = 0;
+
+FILE *filePtr = fopen("output.txt", "w");
+
+if(filePtr == NULL){
+perror("file open error");
+}
 
 unsigned int increment = 1000; //Amount we will increment each loop iteration for now.
 
@@ -152,20 +157,6 @@ for(x = 1; x < 21; x++){
 res[x].totalAvailable = (rand() % (10-2) + 1); //Generate random number 1-10 for our resource
 
 }
-/*
-//Launch first process for testing
-pid_t childPid = fork();
-
-if(childPid == -1){
-	perror("failed to fork in oss");
-	exit(1);
-}
-
-if(childPid == 0){
-	char* args[] = {"./user", "0", 0};
-	execvp(args[0], args);
-}
-*/
 
 int nextProcessIndex = 0;
 
@@ -180,12 +171,46 @@ while(1){
 		clock[0] += 1;
 		clock[1] = clock[1] - 1000000000;
 	}
-	
-	if(clock[0] == nextSecond && totalProcesses < 2){
-		printf("Total processes = %d launching new process\n", totalProcesses);
+	//If we have reached 40 total processes terminate
+	if(totalProcesses >= 40){
+		myhandler(1);
+		break;
+	}
+
+	//Every 2 seconds generate a new process.
+	if(clock[0] == nextSecond && totalProcesses < 18){
 		
+		//Count how many running processes are in the system
+		int runningProcs;
+        	for(x = 0; x < 18; x++){
+                	if(procs[x].terminated == 2){
+                        	runningProcs++;
+                	}
+        	}
+		//If there are 18 running processes wait for one to to finish.
+		if(runningProcs == 18){
+			wait(NULL);
+		}
+		
+		if(fileLines < 10000){
+			fprintf(filePtr, "Total processes = %d launching new process\n", totalProcesses);
+			fileLines++;
+		}	
 		char charIndex[1];
-	
+		
+		//If we have filled all 18 process spots then we cant rely on our nexProcessIndex any longer we need to find a finished process and take over its spot in shared memory.
+		if(totalProcesses >= 18){	
+			int x;
+			for(x = 0; x < 18; x++){
+				if(procs[x].terminated == 1){
+					nextProcessIndex = x;
+					break;
+				}
+
+			}
+
+		}
+
 		sprintf(charIndex, "%d", nextProcessIndex);
 
 		pid_t childPid = fork();
@@ -209,12 +234,21 @@ while(1){
 	//Loop through all the processes seeing if any have requested
 	for(x = 0; x < 18; x++){
 		//If there is a request handle it here		
-		if(procs[x].resRequest != 30 && procs[x].resRequest > 0 && procs[x].blocked != 1){
-			printf("Process %d has requested %d of resource %d\nTime of request %d seconds, %d nanoseconds\n", x, procs[x].claims[procs[x].resRequest] , procs[x].resRequest, clock[0], clock[1]);
+		if(procs[x].resRequest != 30 && procs[x].resRequest > 0 && procs[x].blocked != 1 && procs[x].terminated != 1){
+			
+			if(fileLines < 10000){
+				fprintf(filePtr,"Process %d has requested %d of resource %d\nTime of request %d seconds, %d nanoseconds\n", x, procs[x].claims[procs[x].resRequest] , procs[x].resRequest, clock[0], clock[1]);
+				fileLines++;
+			}
 
 			//If our algorithm has determined we are in a safe state then carry out the allocation.
 			if(safe()){
-				printf("State is safe. Allocating resources.\n");
+				
+				if(fileLines < 10000){
+					fprintf(filePtr,"State is safe. Allocating resources.\n");
+					fileLines++;
+				}
+
 				//Add the request to the allocation for the resource
 				res[procs[x].resRequest].allocated += procs[x].claims[procs[x].resRequest];
 				//Add the amount requested to the allocation for that resource in the process.
@@ -223,7 +257,12 @@ while(1){
 				procs[x].resRequest = 30;			
 			}
 			else{ //Here we would be in an unsafe state, so we wont grant the request, and we will place the resource in the wait queue.
-				printf("Cannot grant %d of resource %d to process %d. Placing process in wait q\n", res[procs[x].resRequest].requested, procs[x].resRequest, x);		
+				
+				if(fileLines < 10000){
+					fprintf(filePtr,"Cannot grant %d of resource %d to process %d. Placing process in wait q\n", res[procs[x].resRequest].requested, procs[x].resRequest, x);		
+					fileLines++;
+				}
+
 				procs[x].blocked = 1;		
 				enqueue(x);
 			}
@@ -243,8 +282,11 @@ while(1){
 			//Similarly we are releasing a resource so this would just be set to 0.
 			procs[x].allocated[posRes] = 0;
 
-			printf("Resource %d being released by process %d\n", posRes, x);
-			
+			if(fileLines < 10000){
+				fprintf(filePtr,"Resource %d being released by process %d\n", posRes, x);
+				fileLines++;
+			}
+
 			int loop = 0;
 			//Only do this when there is something in the queue
 			if(size() > 0){
@@ -253,13 +295,13 @@ while(1){
 			
 				//If the request for the process can be granted by current availability then grant the request, if not place back in queue and continue loop		
 					if(procs[tempIndex].claims[procs[tempIndex].resRequest] <= res[procs[tempIndex].resRequest].totalAvailable - res[procs[tempIndex].resRequest].allocated){ 			
-						printf("Process %d removed from queue, removing blocked flag.\n", tempIndex, procs[tempIndex].resRequest);
-						/*
-						//Add the requested amount to the allocation for that resource.
-						res[procs[tempIndex].resRequest].allocated += procs[tempIndex].claims[procs[tempIndex].resRequest];
-						//Add the amount requested to the allocation for that resource in the process.							
-						procs[tempIndex].allocated[procs[tempIndex].resRequest] += procs[tempIndex].claims[procs[tempIndex].resRequest];
-						*/
+			
+						if(fileLines < 10000){
+							fprintf(filePtr,"Process %d removed from queue, removing blocked flag.\n", tempIndex, procs[tempIndex].resRequest);
+							fileLines++;
+						}
+
+						dequeue(tempIndex);
 						procs[tempIndex].blocked = 0;
 						break;
 
@@ -269,8 +311,9 @@ while(1){
 					}
 			
 					loop++; //Do this process for each item in the queue. It will either be placed back in or removed and fulfilled.
-					if(loop == size()){
-						printf("No processes in queue were able to be granted resources.\n");
+					if(loop == size() && fileLines < 10000){
+						fprintf(filePtr,"No processes in queue were able to be granted resources.\n");
+						fileLines++;
 						break;
 					}
 				}
@@ -288,8 +331,10 @@ shmctl(shmid1, IPC_RMID, NULL);
 shmctl(shmid2, IPC_RMID, NULL);
 shmctl(shmid3, IPC_RMID, NULL);
 
-printf("Program will now terminate\n");
-
+if(fileLines < 10000){
+	fprintf(filePtr,"Program will now terminate\n");
+	fileLines++;
+}
 
 }
 
@@ -409,19 +454,6 @@ for(x = 0; x < 18; x++){
 	}
 	else{		
 		possible = 0;
-		printf("None found in safe()\n");
-		
-		for(x = 1; x < 21; x++){
-			printf("currentAvail R%d = %d\n", x, currentAvailable[x]);
-			
-		}
-		for(x = 1; x < 21; x++){
-
-			printf("totalAvailable R%d = %d\n", x, res[x].totalAvailable);
-		}
-		for(x = 1; x < 21; x++){
-			printf("CurrentlyAllocated R%d = %d\n", x, res[x].allocated);
-		} 
 	}
 
 
@@ -454,9 +486,6 @@ void enqueue(int procIndex){
 	
 		intArray[++rear] = procIndex;
 		itemCount++;
-	}
-	else{
-		printf("Queue full\n");
 	}
 
 }
