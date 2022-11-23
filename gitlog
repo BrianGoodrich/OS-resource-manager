@@ -1,0 +1,41 @@
+commit 6f449a44ebf231984c927ab43741c87d2fa0f839
+Author: brian goodrich <goodrich@hoare7.cs.umsl.edu>
+Date:   Tue Nov 22 23:30:31 2022 -0600
+
+    final commit, program is working with many user processes and writing to the file fine. For some reason it will occasionally give a failure to fork res unavailable on low number forks.
+
+commit d6f3f8b5ed1dea5249ee5a330af4cfc475019302
+Author: brian goodrich <goodrich@hoare7.cs.umsl.edu>
+Date:   Tue Nov 22 20:34:00 2022 -0600
+
+    Program writing to file and working good with up to 18 resources, will now decrease inteveral, allow more than a total of 18 resources. Slight bug with some processes being denied a request of 0 resources, and then granted that request later on.
+
+commit c02b64d4ed21889da4e2530b804c5b18d4d85223
+Author: brian goodrich <goodrich@hoare7.cs.umsl.edu>
+Date:   Tue Nov 22 15:16:23 2022 -0600
+
+    Deadlock avoidance algo currently working with 2 processes, had to change all accesses of the resources to exclusively OSS and user processes will only access their own process block in memory. Need to implement forking off more than 2 processes, and waiting if there are 18 currently running. Also terminate at 40 total creations
+
+commit 0bfede1ba82d1d3a0edb8e1078b24cda32fd3c66
+Author: brian goodrich <goodrich@hoare7.cs.umsl.edu>
+Date:   Tue Nov 22 10:41:05 2022 -0600
+
+    Deadlock prevention algo seems to be working, single user process is able to run and complete. But the output is partially just user printing granted, immediately releasing, then granting the other, without oss being able to print anything. Not sure if its just buffering the outputs or what.
+
+commit 7705ae82f2a0b03e676c57a6aceace39d46d8bc6
+Author: brian goodrich <goodrich@hoare7.cs.umsl.edu>
+Date:   Tue Nov 22 00:11:15 2022 -0600
+
+    End of day commit. Deadlock avoidance algo fully written need to make sure user and oss are setting values in all the structs properly before testing it. Need to set default values for claims, and allocated in process struct, and make sure all the variables are being set in the resources structs as well.
+
+commit b32c953ee048c5fbd107dd4cd9b4468e735dd0db
+Author: brian goodrich <goodrich@hoare7.cs.umsl.edu>
+Date:   Mon Nov 21 21:48:20 2022 -0600
+
+    Single process currently in working state requesting each resource, releasing when granted, and then requesting the next linearly. Added the struct and wanted to make sure everything was working and saved before implementing the deadlock algorithm and adding multiple processes.
+
+commit ddb24e0928750c9fb9a1a28256a11f133d949956
+Author: brian goodrich <goodrich@hoare7.cs.umsl.edu>
+Date:   Mon Nov 21 21:22:14 2022 -0600
+
+    First commit, got user and oss communicating and user requesting resources and releasing them individually, oss is granting resources each time, only running with 1 user process. Currently starting the deadlock detection algorithm. Changed process array to a struct so that max claims could be stored there.

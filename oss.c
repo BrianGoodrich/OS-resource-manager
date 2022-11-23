@@ -187,13 +187,7 @@ if(clock[0] == nextSecond){
                         	runningProcs++;
                 	}
         	}
-		/*
-		//If there are 18 running processes wait for one to to finish.
-		if(totalProcesses >= 18){
-			wait(NULL);
-			runningProcs = 0;
-		}
-		*/
+		
 
 	//Only generate a new resource if there are less than 18 currently running.
 	if(runningProcs < 18){
