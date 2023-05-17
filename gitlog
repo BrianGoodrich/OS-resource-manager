@@ -1,3 +1,9 @@
+commit 43300a5eb9234eb8ef6cf9595cdfc8d724fe6357
+Author: brian goodrich <goodrich@hoare7.cs.umsl.edu>
+Date:   Tue Nov 22 23:33:34 2022 -0600
+
+    removed commented out code
+
 commit 6f449a44ebf231984c927ab43741c87d2fa0f839
 Author: brian goodrich <goodrich@hoare7.cs.umsl.edu>
 Date:   Tue Nov 22 23:30:31 2022 -0600
